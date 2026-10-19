@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f6f1">
+    <meta name="description" content="See how monthly investments and compound interest can grow over time.">
+    <title>Income & Interest — Investment Growth Calculator</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header" id="home">
+      <a class="brand" href="#home" aria-label="Income and Interest home">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>income <span class="brand-amp">&</span> interest</span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a href="#home">Home</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#example">Example</a>
+      </nav>
+      <a class="header-cta" href="#calculator">Try the calculator <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main>
+      <section class="hero page-width" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-star" aria-hidden="true">✳</span> A LITTLE CAN GO A LONG WAY</p>
+          <h1 id="page-title">Small investments.<br><span>Big possibilities.</span></h1>
+          <p class="hero-description">See how steady contributions and compound interest can shape your financial future.</p>
+        </div>
+        <div class="hero-note" aria-hidden="true">
+          <span class="hero-note-arrow">↗</span>
+          <span>Your future<br>starts here</span>
+        </div>
+      </section>
+
+      <section class="calculator page-width" id="calculator" aria-labelledby="calculator-title">
+        <div class="calculator-heading">
+          <div>
+            <p class="eyebrow">YOUR PLAN, YOUR PACE</p>
+            <h2 id="calculator-title">Build your investment timeline</h2>
+          </div>
+          <span class="calculator-badge"><span></span> Free calculator</span>
+        </div>
+
+        <form id="simulation-form" class="calculator-form">
+          <div class="field-group">
+            <label class="field-label" for="monthly-contribution">Monthly contribution</label>
+            <div class="input-wrap currency-input">
+              <span aria-hidden="true">R$</span>
+              <input id="monthly-contribution" name="monthlyContribution" type="number" min="0.01" step="0.01" value="500" required inputmode="decimal">
+            </div>
+            <span class="field-hint">Your regular monthly investment</span>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="interest-rate">Interest rate</label>
+            <div class="input-pair">
+              <div class="input-wrap rate-input">
+                <input id="interest-rate" name="interestRate" type="number" min="0" step="0.01" value="8" required inputmode="decimal">
+                <span aria-hidden="true">%</span>
+              </div>
+              <div class="select-wrap">
+                <select id="interest-period" name="interestPeriod" aria-label="Interest rate period">
+                  <option value="annual" selected>per year</option>
+                  <option value="monthly">per month</option>
+                </select>
+              </div>
+            </div>
+            <span class="field-hint">Choose a monthly or annual rate</span>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="duration">Investment period</label>
+            <div class="input-pair">
+              <div class="input-wrap duration-input">
+                <input id="duration" name="duration" type="number" min="1" step="1" value="10" required inputmode="numeric">
+              </div>
+              <div class="select-wrap">
+                <select id="duration-unit" name="durationUnit" aria-label="Investment period unit">
+                  <option value="years" selected>years</option>
+                  <option value="months">months</option>
+                </select>
+              </div>
+            </div>
+            <span class="field-hint">Up to 100 years</span>
+          </div>
+
+          <button class="submit-button" type="submit">
+            <span>Calculate growth</span>
+            <span class="button-arrow" aria-hidden="true">↗</span>
+          </button>
+        </form>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+
+        <div class="result-summary" aria-live="polite" aria-atomic="true">
+          <div class="summary-main">
+            <span class="summary-label">Estimated portfolio at the end</span>
+            <strong id="final-patrimony">—</strong>
+            <span id="duration-caption" class="summary-caption">Enter your details to see your projection.</span>
+          </div>
+          <div class="summary-metrics">
+            <div class="summary-metric">
+              <span>Starting balance</span>
+              <strong id="initial-patrimony">—</strong>
+            </div>
+            <div class="summary-metric">
+              <span>Total contributions</span>
+              <strong id="total-contributions">—</strong>
+            </div>
+            <div class="summary-metric">
+              <span>Estimated interest</span>
+              <strong id="interest-earned">—</strong>
+            </div>
+            <div class="summary-metric">
+              <span>Growth on contributions</span>
+              <strong id="growth-percent">—</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="timeline-section page-width" aria-labelledby="timeline-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">THE POWER OF COMPOUNDING</p>
+            <h2 id="timeline-title">Your investment timeline</h2>
+          </div>
+          <p class="section-subtitle" id="chart-summary">Your projected balance will appear here.</p>
+        </div>
+
+        <div class="timeline-layout">
+          <div class="chart-card">
+            <div class="chart-heading">
+              <div>
+                <span class="chart-title">Portfolio value over time</span>
+                <span class="chart-description">Projected balance compared with total contributions</span>
+              </div>
+              <span class="chart-period" id="chart-period">—</span>
+            </div>
+            <div class="chart-wrap">
+              <svg id="investment-chart" viewBox="0 0 800 330" role="img" aria-label="Investment growth chart">
+                <text class="chart-placeholder" x="400" y="165" text-anchor="middle">Run a calculation to see your timeline.</text>
+              </svg>
+            </div>
+            <div class="chart-legend" aria-label="Chart legend">
+              <span><i class="legend-line legend-balance"></i> Portfolio value</span>
+              <span><i class="legend-line legend-contributions"></i> Total contributions</span>
+              <span><i class="legend-marker"></i> Your chosen time</span>
+            </div>
+          </div>
+
+          <aside class="did-you-know" aria-labelledby="did-you-know-title">
+            <div class="did-you-know-top">
+              <span class="bulb-icon" aria-hidden="true">✳</span>
+              <span class="tip-tag">A MOMENT TO THINK</span>
+            </div>
+            <h3 id="did-you-know-title">Did you know?</h3>
+            <p id="did-you-know-copy">Time gives your earnings more room to earn returns of their own. Even a small regular contribution can benefit from a longer horizon.</p>
+            <a href="#example" class="text-link">Explore a longer timeline <span aria-hidden="true">→</span></a>
+            <span class="decorative-spark" aria-hidden="true">✳</span>
+          </aside>
+        </div>
+      </section>
+
+      <section class="time-section page-width" id="example" aria-labelledby="time-title">
+        <div class="time-heading">
+          <div>
+            <p class="eyebrow">GIVE YOUR MONEY MORE TIME</p>
+            <h2 id="time-title">What could more time do?</h2>
+          </div>
+          <p class="section-subtitle">See how the projection changes if you keep the same monthly contributions going.</p>
+        </div>
+        <div class="scenario-grid" id="time-scenarios" aria-live="polite">
+          <div class="scenario-empty">Run a calculation to compare longer timelines.</div>
+        </div>
+        <p class="scenario-note" id="scenario-note">Each scenario continues the monthly contributions and interest rate you entered.</p>
+      </section>
+
+      <section class="method-section page-width" id="how-it-works" aria-labelledby="method-title">
+        <div class="method-heading">
+          <span class="method-icon" aria-hidden="true">i</span>
+          <div>
+            <p class="eyebrow">CLEAR ASSUMPTIONS</p>
+            <h2 id="method-title">How it's calculated</h2>
+          </div>
+        </div>
+        <div class="method-grid">
+          <p><strong>Monthly rhythm.</strong> Existing savings earn interest first, then that month's contribution is added. This means the first deposit earns for all remaining months and the final deposit earns no interest.</p>
+          <p><strong>Annual rates.</strong> An annual rate is treated as an effective rate and converted to its equivalent monthly rate before compounding.</p>
+          <p><strong>Growth percentage.</strong> Estimated interest is compared with total contributions. The starting balance is zero, so a percentage increase from the starting balance is undefined.</p>
+          <p><strong>For illustration.</strong> Projections do not include fees, taxes, inflation, or changing returns. They are estimates, not guarantees.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer page-width">
+      <a class="brand footer-brand" href="#home">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>income <span class="brand-amp">&</span> interest</span>
+      </a>
+      <span>A simple way to picture the road ahead.</span>
+    </footer>
+  </body>
+</html>
+
