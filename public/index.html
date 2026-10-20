@@ -3,18 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#64172c">
     <meta name="description" content="Explore how regular investing and compound interest can grow over time." data-i18n-content="META_DESCRIPTION">
     <title data-i18n="HEADER_TITLE">Income &amp; Interest Expectations</title>
     <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" sizes="32x32">
     <link rel="stylesheet" href="/styles.css">
-    <script src="/app.js" defer></script>
+    <script type="module" src="/app.js"></script>
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#home" data-view-link="home" aria-label="Income and Interest Expectations" data-i18n-aria="HEADER_TITLE">
         <span class="brand-dollar" aria-hidden="true">$</span>
-        <span class="brand-name">
+        <span class="brand-name" id="brand-name" data-order="suffix">
           <span class="brand-main"><span data-i18n="HEADER_LINE_1">INCOME &amp;</span><br><span data-i18n="HEADER_LINE_2">INTEREST</span></span>
           <span class="brand-expectations" data-i18n="HEADER_EXPECTATIONS">EXPECTATIONS</span>
         </span>
@@ -33,7 +33,8 @@
     <main class="main-frame">
       <div class="curtain curtain-left" aria-hidden="true"></div>
       <div class="curtain curtain-right" aria-hidden="true"></div>
-      <section class="view-panel frame-inner" id="view-home" data-view-panel="home" aria-labelledby="timeline-title">
+
+      <section class="view-panel frame-inner calculator-view" id="calculator-view" data-view-panel="calculator" aria-labelledby="timeline-title">
         <form id="simulation-form" class="calculator-form">
           <div class="intro-copy" aria-label="Tiny investments, huge options" data-i18n-aria="INTRO_ARIA">
             <span data-i18n="INTRO_TINY">Tiny investments</span>
@@ -42,26 +43,22 @@
 
           <div class="field-group">
             <label class="field-label" for="monthly-contribution" data-i18n="FIELD_INCOME">Income</label>
-            <div class="field-select">
-              <select id="income-period" name="incomePeriod" aria-label="Income frequency" data-i18n-aria="INCOME_FREQUENCY_ARIA">
-                <option value="monthly" data-i18n="UNIT_MONTHLY">Monthly</option>
-                <option value="annual" data-i18n="UNIT_YEARLY">Yearly</option>
-              </select>
-            </div>
+            <select class="field-period" id="income-period" name="incomePeriod" aria-label="Income frequency" data-i18n-aria="INCOME_FREQUENCY_ARIA">
+              <option value="monthly" data-i18n="UNIT_MONTHLY">Monthly</option>
+              <option value="annual" data-i18n="UNIT_YEARLY">Yearly</option>
+            </select>
             <div class="input-wrap income-wrap">
-              <span class="currency-symbol" aria-hidden="true">R$</span>
+              <span class="currency-symbol" id="currency-symbol" aria-hidden="true" title="US dollars (USD)">USD</span>
               <input id="monthly-contribution" name="monthlyContribution" type="number" min="0.01" step="0.01" value="500" required inputmode="decimal" aria-label="Income amount" data-i18n-aria="INCOME_AMOUNT_ARIA">
             </div>
           </div>
 
           <div class="field-group">
             <label class="field-label" for="interest-rate" data-i18n="FIELD_INTEREST">Interest</label>
-            <div class="field-select">
-              <select id="interest-period" name="interestPeriod" aria-label="Interest rate frequency" data-i18n-aria="INTEREST_FREQUENCY_ARIA">
-                <option value="monthly" data-i18n="UNIT_MONTHLY">Monthly</option>
-                <option value="annual" selected data-i18n="UNIT_YEARLY">Yearly</option>
-              </select>
-            </div>
+            <select class="field-period" id="interest-period" name="interestPeriod" aria-label="Interest rate frequency" data-i18n-aria="INTEREST_FREQUENCY_ARIA">
+              <option value="monthly" data-i18n="UNIT_MONTHLY">Monthly</option>
+              <option value="annual" selected data-i18n="UNIT_YEARLY">Yearly</option>
+            </select>
             <div class="input-wrap rate-wrap">
               <input id="interest-rate" name="interestRate" type="number" min="0" step="0.01" value="8" required inputmode="decimal" aria-label="Interest rate" data-i18n-aria="INTEREST_RATE_ARIA">
               <span class="percent-symbol" aria-hidden="true">%</span>
@@ -70,12 +67,10 @@
 
           <div class="field-group">
             <label class="field-label" for="duration" data-i18n="FIELD_TIME">Time</label>
-            <div class="field-select">
-              <select id="duration-unit" name="durationUnit" aria-label="Investment duration unit" data-i18n-aria="TIME_UNIT_ARIA">
-                <option value="months" data-i18n="UNIT_MONTHS">Months</option>
-                <option value="years" selected data-i18n="UNIT_YEARS">Years</option>
-              </select>
-            </div>
+            <select class="field-period" id="duration-unit" name="durationUnit" aria-label="Investment duration unit" data-i18n-aria="TIME_UNIT_ARIA">
+              <option value="months" data-i18n="UNIT_MONTHS">Months</option>
+              <option value="years" selected data-i18n="UNIT_YEARS">Years</option>
+            </select>
             <div class="input-wrap time-wrap">
               <input id="duration" name="duration" type="number" min="1" step="1" value="10" required inputmode="numeric" aria-label="Investment duration" data-i18n-aria="TIME_AMOUNT_ARIA">
             </div>
@@ -86,96 +81,116 @@
 
         <p class="form-error" id="form-error" role="alert" hidden></p>
 
-        <div class="timeline-section">
+        <section class="timeline-section" aria-labelledby="timeline-title">
           <div class="timeline-heading">
-            <h1 id="timeline-title" data-i18n="TIMELINE_TITLE">Your Timeline</h1>
+            <div class="timeline-title-wrap">
+              <div class="title-line">
+                <h1 id="timeline-title" data-i18n="TIMELINE_TITLE">Your Timeline</h1>
+                <span class="demo-pill" id="demo-pill" hidden><i aria-hidden="true"></i><span data-i18n="EXAMPLE_LIVE">Live example</span></span>
+              </div>
+              <p class="duration-caption" id="duration-caption" data-i18n="SUMMARY_EMPTY">Enter your details to see your projection.</p>
+            </div>
+            <div class="results-summary" aria-live="polite" aria-atomic="true" aria-label="Investment results" data-i18n-aria="RESULTS_ARIA">
+              <div class="result-item">
+                <span class="result-label" data-i18n="SUMMARY_START">Starting balance</span>
+                <strong id="initial-patrimony">—</strong>
+              </div>
+              <div class="result-item">
+                <span class="result-label" data-i18n="RESULT_CONTRIBUTIONS">Contributions</span>
+                <strong id="total-contributions">—</strong>
+              </div>
+              <div class="result-item result-interest">
+                <span class="result-label" data-i18n="RESULT_GROWTH">Interest earned</span>
+                <strong><span id="interest-earned">—</span><small id="growth-percent"></small></strong>
+              </div>
+              <div class="result-item result-final">
+                <span class="result-label" data-i18n="SUMMARY_END">At the end</span>
+                <strong id="final-patrimony">—</strong>
+              </div>
+            </div>
           </div>
 
-          <div class="result-line" aria-live="polite" aria-atomic="true">
-            <span><span data-i18n="SUMMARY_START">Starting balance</span> <strong id="initial-patrimony">—</strong></span>
-            <span><span data-i18n="SUMMARY_END">At the end</span> <strong id="final-patrimony">—</strong></span>
-            <span><span data-i18n="SUMMARY_GROWTH">Growth on contributions</span> <strong id="growth-percent">—</strong></span>
-            <span class="result-detail" id="duration-caption" data-i18n="SUMMARY_EMPTY">Enter your details to see your projection.</span>
-          </div>
+          <div class="chart-layout">
+            <div class="chart-panel">
+              <div class="chart-wrap" id="chart-wrap">
+                <svg id="investment-chart" viewBox="0 0 1100 430" role="img" aria-label="Investment growth chart" data-i18n-aria="CHART_ARIA">
+                  <text class="chart-placeholder" x="550" y="220" text-anchor="middle" data-i18n="CHART_PLACEHOLDER">Your investment timeline will appear here.</text>
+                </svg>
+              </div>
+              <div class="chart-caption">
+                <span><i class="legend-line legend-balance" aria-hidden="true"></i><span data-i18n="CHART_SELECTED_LEGEND">Your selected timeline</span></span>
+                <span><i class="legend-line legend-projection" aria-hidden="true"></i><span data-i18n="CHART_PROJECTION_LEGEND">Possible future growth</span></span>
+                <span class="chart-period" id="chart-period">—</span>
+              </div>
+            </div>
 
-          <div class="chart-stage">
-            <svg id="investment-chart" viewBox="0 0 1500 430" role="img" aria-label="Investment growth chart" data-i18n-aria="CHART_ARIA">
-              <text class="chart-placeholder" x="750" y="220" text-anchor="middle" data-i18n="CHART_PLACEHOLDER">Your investment timeline will appear here.</text>
-            </svg>
-
-            <aside class="did-you-know" id="did-you-know" aria-labelledby="did-you-know-title">
-              <span class="tip-icon" aria-hidden="true">?</span>
-              <h2 id="did-you-know-title" data-i18n="DID_YOU_KNOW_TITLE">Did you know?</h2>
-              <p id="did-you-know-copy" data-i18n="DID_YOU_KNOW_EMPTY">Giving your investments more time can give compound growth more room to work.</p>
+            <aside class="insight-panel" id="did-you-know" aria-labelledby="did-you-know-title">
+              <div class="insight-heading">
+                <span class="insight-mark" aria-hidden="true">i</span>
+                <div><p class="insight-kicker" data-i18n="INSIGHT_KICKER">A small insight</p><h2 id="did-you-know-title" data-i18n="DID_YOU_KNOW_TITLE">Did you know?</h2></div>
+              </div>
+              <p class="insight-copy" id="did-you-know-copy" data-i18n="DID_YOU_KNOW_EMPTY">Giving your investments more time can give compound growth more room to work.</p>
+              <div class="insight-footer">
+                <span class="insight-count" id="insight-count" aria-live="polite">01 / 03</span>
+                <button class="insight-next" id="insight-next" type="button" aria-label="Show another insight" data-i18n-aria="INSIGHT_NEXT_ARIA"><span aria-hidden="true">→</span></button>
+              </div>
             </aside>
           </div>
-
-          <div class="chart-caption">
-            <span><i class="legend-line legend-balance" aria-hidden="true"></i><span data-i18n="CHART_SELECTED_LEGEND">Your selected timeline</span></span>
-            <span><i class="legend-line legend-projection" aria-hidden="true"></i><span data-i18n="CHART_PROJECTION_LEGEND">Possible future growth</span></span>
-            <span class="chart-period" id="chart-period">—</span>
-          </div>
-
-        </div>
+          <p class="form-error chart-error" id="chart-error" role="alert" hidden></p>
+        </section>
       </section>
 
-      <section class="view-panel frame-inner secondary-view" id="view-how" data-view-panel="how" aria-labelledby="how-title" hidden>
-        <div class="secondary-heading">
-          <h1 id="how-title" data-i18n="HOW_TITLE">How it's calculated</h1>
-          <p data-i18n="HOW_INTRO">A monthly investing rhythm, with each deposit earning interest only after it is added.</p>
+      <section class="view-panel frame-inner secondary-view method-view" id="view-how" data-view-panel="how" aria-labelledby="how-title" hidden>
+        <div class="secondary-heading method-heading">
+          <div><p class="section-eyebrow" data-i18n="HOW_EYEBROW">THE MATHEMATICS</p><h1 id="how-title" data-i18n="HOW_TITLE">How it's calculated</h1></div>
+          <p class="section-intro" data-i18n="HOW_INTRO">A monthly contribution meets a rate that credits interest at its chosen pace.</p>
         </div>
-        <div class="explanation-list">
-          <article>
-            <span class="explanation-number">01</span>
-            <div><h2 data-i18n="HOW_STEP_ONE_TITLE">Start at zero</h2><p data-i18n="HOW_STEP_ONE_COPY">The projection begins with a R$0.00 balance before the first contribution.</p></div>
+        <div class="math-board">
+          <article class="math-step">
+            <span class="math-index">01</span>
+            <div class="math-copy"><h2 data-i18n="HOW_STEP_ONE_TITLE">Keep each deposit in sequence</h2><p data-i18n="HOW_STEP_ONE_COPY">Monthly income is added after an interest tick, so the newest deposit waits until the next one.</p></div>
+            <div class="formula-block"><span class="formula-label" data-i18n="HOW_FORMULA_CONTRIBUTION_LABEL">Monthly deposit</span><strong>C<sub>m</sub> = C<sub>a</sub> / 12</strong><span class="formula-note" data-i18n="HOW_FORMULA_CONTRIBUTION_NOTE">An annual income input is divided into twelve monthly deposits.</span></div>
           </article>
-          <article>
-            <span class="explanation-number">02</span>
-            <div><h2 data-i18n="HOW_STEP_TWO_TITLE">Compound the existing balance</h2><p data-i18n="HOW_STEP_TWO_COPY">At the start of each month, the invested balance earns the monthly interest rate.</p></div>
+          <article class="math-step">
+            <span class="math-index">02</span>
+            <div class="math-copy"><h2 data-i18n="HOW_STEP_TWO_TITLE">Choose the interest rhythm</h2><p data-i18n="HOW_STEP_TWO_COPY">A monthly rate compounds every month. An annual rate compounds every twelve months.</p></div>
+            <div class="formula-block"><span class="formula-label" data-i18n="HOW_FORMULA_RATE_LABEL">Interest ticks per year</span><strong>r = x / 100</strong><strong>p = 1 <span data-i18n="HOW_FORMULA_RATE_OR">or</span> p = 12</strong><span class="formula-note" data-i18n="HOW_FORMULA_RATE_NOTE">x is the entered percentage, r is its decimal form; p = 1 for monthly rates and p = 12 for annual rates.</span></div>
           </article>
-          <article>
-            <span class="explanation-number">03</span>
-            <div><h2 data-i18n="HOW_STEP_THREE_TITLE">Add the new contribution</h2><p data-i18n="HOW_STEP_THREE_COPY">The monthly contribution is added after interest. The first deposit earns for all remaining months, and the final deposit earns no interest.</p></div>
+          <article class="math-step">
+            <span class="math-index">03</span>
+            <div class="math-copy"><h2 data-i18n="HOW_STEP_THREE_TITLE">Apply interest at each tick</h2><p data-i18n="HOW_STEP_THREE_COPY">The balance grows at the selected rate tick, then this month's deposit is added.</p></div>
+            <div class="formula-block formula-highlight"><span class="formula-label" data-i18n="HOW_FORMULA_BALANCE_LABEL">Balance after month m</span><strong>B<sub>m</sub> = B<sub>m−1</sub>(1 + r) + C</strong><span class="formula-note" data-i18n="HOW_FORMULA_BALANCE_NOTE">If m is not an interest tick, B<sub>m</sub> = B<sub>m−1</sub> + C. The last deposit earns no future tick.</span></div>
           </article>
-          <article>
-            <span class="explanation-number">04</span>
-            <div><h2 data-i18n="HOW_STEP_FOUR_TITLE">Convert annual rates</h2><p data-i18n="HOW_STEP_FOUR_COPY">An effective annual interest rate is converted to its equivalent monthly rate before compounding. A yearly income amount is split into twelve monthly contributions.</p></div>
+          <article class="math-step">
+            <span class="math-index">04</span>
+            <div class="math-copy"><h2 data-i18n="HOW_STEP_FOUR_TITLE">Count each later tick</h2><p data-i18n="HOW_STEP_FOUR_COPY">Every deposit compounds only for the interest ticks that happen after it.</p></div>
+            <div class="formula-block"><span class="formula-label" data-i18n="HOW_FORMULA_TOTAL_LABEL">Balance after N months</span><strong>B<sub>N</sub> = C Σ<sub>m=1</sub><sup>N</sup>(1 + r)<sup>q(m)</sup></strong><span class="formula-note" data-i18n="HOW_FORMULA_TOTAL_NOTE">q(m) counts the later interest ticks; a final deposit has q(N) = 0.</span></div>
           </article>
         </div>
-        <p class="method-formula" data-i18n="HOW_FORMULA">Monthly balance = previous balance × (1 + monthly rate) + monthly contribution</p>
-        <p class="method-footnote" data-i18n="HOW_FOOTNOTE">Growth percentage compares estimated interest with total contributions. Estimates exclude taxes, fees, inflation, and changing returns.</p>
-      </section>
-
-      <section class="view-panel frame-inner secondary-view" id="view-example" data-view-panel="example" aria-labelledby="example-title" hidden>
-        <div class="secondary-heading">
-          <h1 id="example-title" data-i18n="EXAMPLE_TITLE">Example</h1>
-          <p data-i18n="EXAMPLE_INTRO">See one possible outcome using a steady contribution and an effective annual interest rate.</p>
-        </div>
-        <div class="example-inputs" aria-label="Example assumptions" data-i18n-aria="EXAMPLE_ASSUMPTIONS_ARIA">
-          <span><strong id="example-input-contribution">R$500</strong><small data-i18n="EXAMPLE_CONTRIBUTION">every month</small></span>
-          <span><strong id="example-input-rate">8%</strong><small data-i18n="EXAMPLE_RATE">per year</small></span>
-          <span><strong id="example-input-duration">10</strong><small data-i18n="EXAMPLE_DURATION">years</small></span>
-        </div>
-        <p class="form-error" id="example-error" role="alert" hidden></p>
-        <div class="example-result" aria-live="polite">
-          <div><span data-i18n="EXAMPLE_TOTAL_DEPOSITS">Total contributions</span><strong id="example-contributions">—</strong></div>
-          <div><span data-i18n="EXAMPLE_INTEREST_EARNED">Estimated interest</span><strong id="example-interest">—</strong></div>
-          <div><span data-i18n="EXAMPLE_ENDING_BALANCE">Estimated portfolio at the end</span><strong id="example-final">—</strong></div>
-        </div>
-        <p class="example-note" data-i18n="EXAMPLE_NOTE">The first monthly contribution earns for 119 months. The final contribution is added at the end and earns no interest.</p>
-        <button class="text-button" id="use-example" type="button" data-i18n="EXAMPLE_USE_BUTTON">Use these values in the calculator</button>
+        <div class="math-footnote"><span class="math-footnote-mark" aria-hidden="true">∴</span><p data-i18n="HOW_FOOTNOTE">Growth compares estimated interest with total contributions. Taxes, fees, inflation, and changing returns are not included.</p></div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <span data-i18n="FOOTER_NOTE">A simple way to picture the road ahead.</span>
+      <span class="footer-note" data-i18n="FOOTER_NOTE">A simple way to picture the road ahead.</span>
       <label class="locale-control" for="locale-switch">
         <span data-i18n="FOOTER_LANGUAGE">Language</span>
         <select id="locale-switch" aria-label="Choose language" data-i18n-aria="FOOTER_LANGUAGE_ARIA">
-          <option value="en" data-i18n="LANGUAGE_ENGLISH">English</option>
-          <option value="pt" data-i18n="LANGUAGE_PORTUGUESE">Português</option>
+          <option value="en">English</option>
+          <option value="zh-Hans">简体中文</option>
+          <option value="hi">हिन्दी</option>
+          <option value="es">Español</option>
+          <option value="ar">العربية</option>
+          <option value="fr">Français</option>
+          <option value="bn">বাংলা</option>
+          <option value="pt">Português</option>
+          <option value="id">Bahasa Indonesia</option>
+          <option value="ur">اردو</option>
         </select>
       </label>
     </footer>
+
+    <img class="demo-cursor" id="demo-cursor" src="/cursor-yellow.svg" alt="" aria-hidden="true" hidden>
+    <div class="demo-target-ring" id="demo-target-ring" aria-hidden="true" hidden></div>
   </body>
 </html>

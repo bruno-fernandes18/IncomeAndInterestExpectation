@@ -1,19 +1,33 @@
+import { InvestmentChartViewModel } from './modules/chart-view-model.js';
+import { InvestmentChartView } from './modules/chart-view.js';
+import { InvestmentResultsView } from './modules/results-view.js';
+import { InvestmentInsightsView } from './modules/insights-view.js';
+import { ExampleDemoController } from './modules/demo-controller.js';
+import { LOCALES, LOCALE_BY_ID } from './modules/locale-config.js';
+
 const form = document.querySelector('#simulation-form');
 const submitButton = form.querySelector('button[type="submit"]');
 const errorMessage = document.querySelector('#form-error');
-const chart = document.querySelector('#investment-chart');
+const chartError = document.querySelector('#chart-error');
+const chartElement = document.querySelector('#investment-chart');
 const localeSelect = document.querySelector('#locale-switch');
-const exampleError = document.querySelector('#example-error');
+const calculatorPanel = document.querySelector('#calculator-view');
+const methodPanel = document.querySelector('#view-how');
+const demoPill = document.querySelector('#demo-pill');
 const localeData = {};
-const MAX_MONTHS = 1200;
+const MONTHS_PER_YEAR = 12;
+const MAX_PROJECTION_YEARS = 100;
+const MAX_MONTHS = MAX_PROJECTION_YEARS * MONTHS_PER_YEAR;
 
 let currentLocale = 'en';
+let currentLocaleConfig = LOCALE_BY_ID.en;
+let activeView = 'home';
 let latestResult = null;
-let latestExample = null;
 let calculationTimer = null;
 let latestCalculationRequest = 0;
-let latestExampleRequest = 0;
 let latestErrorKey = '';
+let demoController = null;
+let savedHomeValues = null;
 
 function text(key) {
   return localeData[currentLocale]?.[key] || localeData.en?.[key] || key;
@@ -26,55 +40,104 @@ function formatTemplate(key, values = {}) {
   );
 }
 
+function formatNumber(value) {
+  return new Intl.NumberFormat(currentLocaleConfig.tag).format(value);
+}
+
 function formatCurrency(value) {
-  return new Intl.NumberFormat(currentLocale === 'pt' ? 'pt-BR' : 'en-US', {
+  return new Intl.NumberFormat(currentLocaleConfig.tag, {
     style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    currency: currentLocaleConfig.currency,
   }).format(value);
 }
 
 function formatCompactCurrency(value) {
-  return new Intl.NumberFormat(currentLocale === 'pt' ? 'pt-BR' : 'en-US', {
+  if (Math.abs(value) >= 1e15) {
+    return new Intl.NumberFormat(currentLocaleConfig.tag, {
+      style: 'currency',
+      currency: currentLocaleConfig.currency,
+      notation: 'scientific',
+      maximumSignificantDigits: 3,
+    }).format(value);
+  }
+  return new Intl.NumberFormat(currentLocaleConfig.tag, {
     style: 'currency',
-    currency: 'BRL',
+    currency: currentLocaleConfig.currency,
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value);
 }
 
 function formatPercent(value) {
-  return new Intl.NumberFormat(currentLocale === 'pt' ? 'pt-BR' : 'en-US', {
+  return new Intl.NumberFormat(currentLocaleConfig.tag, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
+function formatCompactPercent(value) {
+  if (Math.abs(value) >= 1e15) {
+    return new Intl.NumberFormat(currentLocaleConfig.tag, {
+      notation: 'scientific',
+      maximumSignificantDigits: 3,
+    }).format(value);
+  }
+  return new Intl.NumberFormat(currentLocaleConfig.tag, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatChartCurrency(value) {
+  if (Math.abs(value) < 1e9) return formatCurrency(value);
+  return new Intl.NumberFormat(currentLocaleConfig.tag, {
+    style: 'currency',
+    currency: currentLocaleConfig.currency,
+    notation: 'scientific',
+    maximumSignificantDigits: 6,
+  }).format(value);
+}
+
 function formatTimeAmount(amount, unit) {
-  const unitKey = unit === 'years' ? 'TIME_YEAR' : 'TIME_MONTH';
-  const pluralKey = amount === 1 ? `${unitKey}_ONE` : `${unitKey}_OTHER`;
-  return `${amount} ${text(pluralKey)}`;
+  const key = unit === 'years' ? 'TIME_YEAR' : 'TIME_MONTH';
+  const plural = amount === 1 ? 'ONE' : 'OTHER';
+  return `${formatNumber(amount)} ${text(`${key}_${plural}`)}`;
+}
+
+function formatAxisMonth(month) {
+  if (month >= MONTHS_PER_YEAR && month % MONTHS_PER_YEAR === 0) return `${formatNumber(month / MONTHS_PER_YEAR)} ${text('CHART_YEAR_ABBR')}`;
+  return `${formatNumber(month)} ${text('CHART_MONTH_ABBR')}`;
+}
+
+function chartAria(result) {
+  const duration = formatTimeAmount(result.duration, result.durationUnit);
+  const selected = formatTemplate('CHART_ARIA_SELECTED', {
+    value: formatCurrency(result.finalPatrimony),
+    duration,
+  });
+  const projection = result.projectionMonths > 0 ? text('CHART_ARIA_PROJECTION') : '';
+  return `${text('CHART_ARIA')} ${selected}${projection}`;
 }
 
 async function loadLocales() {
-  const [englishResponse, portugueseResponse] = await Promise.all([
-    fetch('/locales/en.json'),
-    fetch('/locales/pt.json'),
-  ]);
-  if (!englishResponse.ok || !portugueseResponse.ok) throw new Error('LOCALE_LOAD_FAILED');
-  localeData.en = await englishResponse.json();
-  localeData.pt = await portugueseResponse.json();
+  const responses = await Promise.all(LOCALES.map(async ({ id }) => {
+    const response = await fetch(`/locales/${id}.json`);
+    if (!response.ok) throw new Error('LOCALE_LOAD_FAILED');
+    return [id, await response.json()];
+  }));
+  for (const [id, translations] of responses) localeData[id] = translations;
 }
 
 function applyLocale(locale) {
-  currentLocale = locale === 'pt' ? 'pt' : 'en';
-  if (!localeData[currentLocale] || Object.keys(localeData[currentLocale]).length === 0) currentLocale = 'en';
+  currentLocale = LOCALE_BY_ID[locale] && localeData[locale] ? locale : 'en';
+  currentLocaleConfig = LOCALE_BY_ID[currentLocale];
   localeSelect.value = currentLocale;
-  document.documentElement.lang = currentLocale === 'pt' ? 'pt-BR' : 'en';
+  document.documentElement.lang = currentLocaleConfig.tag;
+  document.documentElement.dir = currentLocaleConfig.direction;
+  document.querySelector('#brand-name').dataset.order = currentLocaleConfig.brandOrder;
   if (!localeData.en || Object.keys(localeData.en).length === 0) return;
-  document.title = text('HEADER_TITLE');
 
+  document.title = text('HEADER_TITLE');
   for (const element of document.querySelectorAll('[data-i18n]')) {
     element.textContent = text(element.dataset.i18n);
   }
@@ -84,26 +147,55 @@ function applyLocale(locale) {
   for (const element of document.querySelectorAll('[data-i18n-content]')) {
     element.setAttribute('content', text(element.dataset.i18nContent));
   }
-
+  const currencySymbol = document.querySelector('#currency-symbol');
+  currencySymbol.textContent = currentLocaleConfig.currency;
+  const currencyName = typeof Intl.DisplayNames === 'function'
+    ? new Intl.DisplayNames([currentLocaleConfig.tag], { type: 'currency' }).of(currentLocaleConfig.currency)
+    : currentLocaleConfig.currency;
+  currencySymbol.title = `${currencyName} (${currentLocaleConfig.currency})`;
+  document.querySelector('#monthly-contribution').setAttribute(
+    'aria-label',
+    `${text('INCOME_AMOUNT_ARIA')} (${currentLocaleConfig.currency})`,
+  );
   if (latestResult) renderResult(latestResult);
-  if (latestExample) renderExample(latestExample);
   if (latestErrorKey) setError(text(latestErrorKey));
-  if (!exampleError.hidden) exampleError.textContent = text('EXAMPLE_ERROR');
 }
 
 function switchView(view, updateAddress = true) {
-  const destination = document.querySelector(`[data-view-panel="${view}"]`)
-    ? view
-    : 'home';
-  for (const panel of document.querySelectorAll('[data-view-panel]')) {
-    panel.hidden = panel.dataset.viewPanel !== destination;
+  const destination = ['home', 'how', 'example'].includes(view) ? view : 'home';
+  const previousView = activeView;
+  if (previousView !== 'example' && destination === 'example') savedHomeValues = captureFormValues();
+  if (previousView === 'example' && destination !== 'example') {
+    demoController?.stop();
+    if (savedHomeValues) restoreFormValues(savedHomeValues);
   }
+  activeView = destination;
+  calculatorPanel.hidden = destination === 'how';
+  methodPanel.hidden = destination !== 'how';
   for (const link of document.querySelectorAll('[data-view-link]')) {
     if (link.dataset.viewLink === destination) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
+  demoPill.hidden = destination !== 'example';
   if (updateAddress) history.pushState({ view: destination }, '', `#${viewHash(destination)}`);
-  if (destination === 'example' && !latestExample) calculateExample();
+  if (destination === 'example') demoController?.start();
+  else if (previousView === 'example' && savedHomeValues) {
+    savedHomeValues = null;
+    form.requestSubmit();
+  }
+}
+
+function captureFormValues() {
+  return Object.fromEntries([...form.elements]
+    .filter((element) => element.name)
+    .map((element) => [element.name, element.value]));
+}
+
+function restoreFormValues(values) {
+  for (const [name, value] of Object.entries(values)) {
+    const field = form.elements[name];
+    if (field) field.value = value;
+  }
 }
 
 function viewHash(view) {
@@ -123,12 +215,57 @@ document.querySelectorAll('[data-view-link]').forEach((link) => {
     switchView(link.dataset.viewLink);
   });
 });
-
 window.addEventListener('popstate', () => switchView(viewFromHash(), false));
 
-form.addEventListener('submit', async (event) => {
+const chartViewModel = new InvestmentChartViewModel();
+const chartView = new InvestmentChartView(chartElement, chartViewModel, {
+  currency: formatChartCurrency,
+  fullCurrency: formatCurrency,
+  compactCurrency: formatCompactCurrency,
+  percent: formatPercent,
+  axisMonth: formatAxisMonth,
+  pointMonth: (month) => formatTemplate('CHART_POINT_MONTH', {
+    month: formatNumber(month),
+    duration: formatTimeAmount(month, 'months'),
+  }),
+  tooltipContributions: (point) => formatTemplate('CHART_TOOLTIP_CONTRIBUTIONS', {
+    value: formatChartCurrency(point.contributions),
+  }),
+  tooltipInterest: (point) => formatTemplate('CHART_TOOLTIP_INTEREST', {
+    value: formatChartCurrency(point.balance - point.contributions),
+  }),
+  chartAria,
+});
+const resultsView = new InvestmentResultsView({
+  initial: document.querySelector('#initial-patrimony'),
+  contributions: document.querySelector('#total-contributions'),
+  interest: document.querySelector('#interest-earned'),
+  growth: document.querySelector('#growth-percent'),
+  final: document.querySelector('#final-patrimony'),
+  duration: document.querySelector('#duration-caption'),
+  period: document.querySelector('#chart-period'),
+}, {
+  currency: formatCurrency,
+  compactCurrency: formatCompactCurrency,
+  percent: formatPercent,
+  compactPercent: formatCompactPercent,
+  duration: formatTimeAmount,
+});
+const insightsView = new InvestmentInsightsView({
+  kicker: document.querySelector('.insight-kicker'),
+  copy: document.querySelector('#did-you-know-copy'),
+  count: document.querySelector('#insight-count'),
+  next: document.querySelector('#insight-next'),
+}, {
+  percent: formatPercent,
+  currency: formatCompactCurrency,
+  unit: (amount, selectedUnit) => text(`${selectedUnit === 'years' ? 'TIME_YEAR' : 'TIME_MONTH'}_${amount === 1 ? 'ONE' : 'OTHER'}`),
+}, text, formatTemplate);
+
+async function submitCalculation(event) {
   event.preventDefault();
   setError('');
+  chartError.hidden = true;
   const requestId = ++latestCalculationRequest;
   setLoading(true);
 
@@ -137,7 +274,7 @@ form.addEventListener('submit', async (event) => {
   const durationUnit = form.elements.durationUnit.value;
   const projectionDuration = chooseProjectionDuration(duration, durationUnit);
   const payload = {
-    monthlyContribution: form.elements.incomePeriod.value === 'annual' ? enteredIncome / 12 : enteredIncome,
+    monthlyContribution: form.elements.incomePeriod.value === 'annual' ? enteredIncome / MONTHS_PER_YEAR : enteredIncome,
     interestRate: Number(form.elements.interestRate.value),
     interestPeriod: form.elements.interestPeriod.value,
     duration,
@@ -156,22 +293,32 @@ form.addEventListener('submit', async (event) => {
     if (requestId !== latestCalculationRequest) return;
     latestResult = result;
     renderResult(result);
+    demoController?.onCalculationResult(result);
   } catch (error) {
     if (requestId === latestCalculationRequest) {
       latestErrorKey = localeData[currentLocale]?.[error.message] ? error.message : 'ERROR_NETWORK';
       setError(text(latestErrorKey));
+      demoController?.onCalculationError();
     }
   } finally {
     if (requestId === latestCalculationRequest) setLoading(false);
   }
-});
+}
 
-form.addEventListener('input', scheduleCalculation);
-form.querySelectorAll('select').forEach((select) => select.addEventListener('change', scheduleCalculation));
+form.addEventListener('submit', submitCalculation);
+form.addEventListener('input', () => {
+  if (!demoController?.applyingValues) scheduleCalculation();
+});
+form.querySelectorAll('select').forEach((select) => select.addEventListener('change', () => {
+  if (!demoController?.applyingValues) scheduleCalculation();
+}));
+window.addEventListener('resize', () => {
+  if (latestResult) resultsView.render(latestResult);
+});
 
 function chooseProjectionDuration(duration, unit) {
   if (!Number.isInteger(duration) || duration <= 0) return null;
-  const unitInMonths = unit === 'years' ? 12 : 1;
+  const unitInMonths = unit === 'years' ? MONTHS_PER_YEAR : 1;
   const selectedMonths = duration * unitInMonths;
   const maximumAdditionalUnits = Math.min(10, Math.floor((MAX_MONTHS - selectedMonths) / unitInMonths));
   if (maximumAdditionalUnits < 2) return null;
@@ -181,116 +328,14 @@ function chooseProjectionDuration(duration, unit) {
 function scheduleCalculation() {
   window.clearTimeout(calculationTimer);
   calculationTimer = window.setTimeout(() => {
-    if (form.reportValidity()) form.requestSubmit();
-  }, 350);
+    if (form.checkValidity()) form.requestSubmit();
+  }, 360);
 }
 
 function renderResult(result) {
-  document.querySelector('#initial-patrimony').textContent = formatCurrency(result.initialPatrimony);
-  document.querySelector('#final-patrimony').textContent = formatCurrency(result.finalPatrimony);
-  document.querySelector('#growth-percent').textContent = `${formatPercent(result.growthPercent)}%`;
-  document.querySelector('#duration-caption').textContent = formatTemplate('SUMMARY_DURATION', {
-    duration: formatTimeAmount(result.duration, result.durationUnit),
-  });
-  document.querySelector('#chart-period').textContent = formatTimeAmount(result.duration, result.durationUnit);
-  renderChart(chart, result);
-  renderInsight(result);
-}
-
-function renderChart(targetChart, result) {
-  targetChart.replaceChildren();
-  const width = 1500;
-  const height = 430;
-  const margin = { top: 22, right: 18, bottom: 48, left: 88 };
-  const axisY = height - margin.bottom;
-  const plotHeight = axisY - margin.top;
-  const plotWidth = width - margin.left - margin.right;
-  const dataWidth = plotWidth * 0.7;
-  const timeline = result.timeline;
-  const selectedMonths = result.months;
-  const maxMonth = Math.max(timeline.at(-1)?.month || selectedMonths, 1);
-  const maxBalance = Math.max(...timeline.map((point) => point.balance), 1);
-  const x = (month) => margin.left + (month / maxMonth) * dataWidth;
-  const y = (value) => margin.top + plotHeight - (value / maxBalance) * plotHeight;
-
-  for (let index = 0; index <= 8; index += 1) {
-    const yPosition = margin.top + (plotHeight * index) / 8;
-    addSvg(targetChart, 'line', { x1: margin.left - 10, y1: yPosition, x2: margin.left, y2: yPosition, class: 'chart-tick' });
-    if (index % 2 === 0) {
-      const value = maxBalance * (1 - index / 8);
-      const label = addSvg(targetChart, 'text', { x: margin.left - 17, y: yPosition + 4, 'text-anchor': 'end', class: 'chart-axis-label' });
-      label.textContent = formatCompactCurrency(value);
-    }
-  }
-
-  addSvg(targetChart, 'line', { x1: margin.left, y1: margin.top, x2: margin.left, y2: axisY, class: 'chart-axis-line' });
-  addSvg(targetChart, 'line', { x1: margin.left, y1: axisY, x2: width - margin.right, y2: axisY, class: 'chart-axis-line' });
-
-  const tickMonths = [...new Set([0, Math.round(maxMonth / 4), Math.round(maxMonth / 2), Math.round((maxMonth * 3) / 4), maxMonth])];
-  for (const month of tickMonths) {
-    const xPosition = margin.left + (month / maxMonth) * plotWidth;
-    addSvg(targetChart, 'line', { x1: xPosition, y1: axisY, x2: xPosition, y2: axisY + 9, class: 'chart-tick' });
-  }
-
-  const selectedX = x(selectedMonths);
-  if (result.projectionMonths > 0) {
-    addSvg(targetChart, 'line', { x1: selectedX, y1: margin.top + 8, x2: selectedX, y2: axisY, class: 'chart-selected-line' });
-  }
-
-  const selectedPoints = timeline.filter((point) => point.month <= selectedMonths);
-  const futurePoints = timeline.filter((point) => point.month >= selectedMonths);
-  addSvg(targetChart, 'path', { d: toPath(selectedPoints, x, (point) => y(point.balance)), class: 'chart-balance-path' });
-  if (futurePoints.length > 1) {
-    addSvg(targetChart, 'path', { d: toPath(futurePoints, x, (point) => y(point.balance)), class: 'chart-future-path' });
-  }
-
-  const selectedPoint = timeline.find((point) => point.month === selectedMonths);
-  const selectedLabel = formatTimeAmount(result.duration, result.durationUnit);
-  const aria = formatTemplate('CHART_ARIA_SELECTED', {
-    value: formatCurrency(selectedPoint?.balance || 0),
-    duration: selectedLabel,
-  });
-  const projectionAria = result.projectionMonths > 0
-    ? text('CHART_ARIA_PROJECTION').replace('{duration}', formatTimeAmount(result.projectionDuration, result.durationUnit))
-    : '';
-  targetChart.setAttribute('aria-label', `${aria}${projectionAria}`);
-}
-
-function renderInsight(result) {
-  const copy = document.querySelector('#did-you-know-copy');
-  if (result.projectionUnavailable) {
-    copy.textContent = text('DID_YOU_KNOW_UNAVAILABLE');
-    return;
-  }
-  if (!result.projectionDuration) {
-    copy.textContent = text('DID_YOU_KNOW_LIMIT');
-    return;
-  }
-
-  const increase = result.finalPatrimony > 0
-    ? ((result.projectionAdditionalValue / result.finalPatrimony) * 100)
-    : 0;
-  copy.textContent = formatTemplate('DID_YOU_KNOW_TEMPLATE', {
-    duration: result.projectionDuration,
-    unit: getTranslatedUnit(result.projectionDuration, result.durationUnit),
-    percent: formatPercent(increase),
-    value: formatCurrency(result.projectionFinalPatrimony),
-  });
-}
-
-function getTranslatedUnit(amount, unit) {
-  return text(`${unit === 'years' ? 'TIME_YEAR' : 'TIME_MONTH'}_${amount === 1 ? 'ONE' : 'OTHER'}`);
-}
-
-function toPath(points, xPosition, yValue) {
-  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${xPosition(point.month).toFixed(2)} ${yValue(point).toFixed(2)}`).join(' ');
-}
-
-function addSvg(targetChart, name, attributes) {
-  const element = document.createElementNS('http://www.w3.org/2000/svg', name);
-  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
-  targetChart.append(element);
-  return element;
+  resultsView.render(result);
+  chartViewModel.setResult(result);
+  insightsView.update(result);
 }
 
 function setError(message) {
@@ -301,56 +346,8 @@ function setError(message) {
 
 function setLoading(isLoading) {
   submitButton.disabled = isLoading;
+  form.setAttribute('aria-busy', String(isLoading));
 }
-
-async function calculateExample() {
-  const requestId = ++latestExampleRequest;
-  exampleError.hidden = true;
-  try {
-    const response = await fetch('/api/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        monthlyContribution: 500,
-        interestRate: 8,
-        interestPeriod: 'annual',
-        duration: 10,
-        durationUnit: 'years',
-        projectionDuration: 5,
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'EXAMPLE_ERROR');
-    if (requestId !== latestExampleRequest) return;
-    latestExample = result;
-    renderExample(result);
-  } catch {
-    if (requestId === latestExampleRequest) {
-      exampleError.textContent = text('EXAMPLE_ERROR');
-      exampleError.hidden = false;
-    }
-  }
-}
-
-function renderExample(result) {
-  document.querySelector('#example-input-contribution').textContent = formatCurrency(500);
-  document.querySelector('#example-input-rate').textContent = `${formatPercent(8)}%`;
-  document.querySelector('#example-input-duration').textContent = '10';
-  document.querySelector('#example-contributions').textContent = formatCurrency(result.totalContributions);
-  document.querySelector('#example-interest').textContent = formatCurrency(result.interestEarned);
-  document.querySelector('#example-final').textContent = formatCurrency(result.finalPatrimony);
-}
-
-document.querySelector('#use-example').addEventListener('click', () => {
-  form.elements.monthlyContribution.value = '500';
-  form.elements.incomePeriod.value = 'monthly';
-  form.elements.interestRate.value = '8';
-  form.elements.interestPeriod.value = 'annual';
-  form.elements.duration.value = '10';
-  form.elements.durationUnit.value = 'years';
-  switchView('home');
-  form.requestSubmit();
-});
 
 localeSelect.addEventListener('change', () => {
   applyLocale(localeSelect.value);
@@ -360,12 +357,21 @@ localeSelect.addEventListener('change', () => {
 async function initialize() {
   try {
     await loadLocales();
-  } catch { /* Keep the English text embedded in the page if locale files are unavailable. */ }
+  } catch { /* Embedded English strings remain as a readable fallback. */ }
   const savedLocale = localStorage.getItem('incomeInterestLocale');
-  applyLocale(savedLocale === 'pt' ? 'pt' : 'en');
+  applyLocale(savedLocale);
+  demoController = new ExampleDemoController({
+    form,
+    cursor: document.querySelector('#demo-cursor'),
+    ring: document.querySelector('#demo-target-ring'),
+    chartView,
+    chartViewModel,
+    requestCalculation: () => form.requestSubmit(),
+  });
   const initialView = viewFromHash();
   switchView(initialView, false);
-  form.requestSubmit();
+  if (initialView === 'example') demoController.start();
+  else form.requestSubmit();
 }
 
 initialize();
