@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/api/simulate', (req, res) => {
   const input = req.body;
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return res.status(400).json({ error: 'Please provide the simulation details.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_REQUEST' });
   }
 
   const {
@@ -22,27 +22,37 @@ app.post('/api/simulate', (req, res) => {
     interestPeriod,
     duration,
     durationUnit,
+    projectionDuration = null,
   } = input;
 
   if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0) {
-    return res.status(400).json({ error: 'Enter a monthly contribution greater than zero.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_INCOME' });
   }
   if (!Number.isFinite(interestRate) || interestRate < 0) {
-    return res.status(400).json({ error: 'Enter a valid interest rate of zero or more.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_RATE' });
   }
   if (interestPeriod !== 'monthly' && interestPeriod !== 'annual') {
-    return res.status(400).json({ error: 'Choose whether the interest rate is monthly or annual.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_INTEREST_PERIOD' });
   }
   if (!Number.isInteger(duration) || duration <= 0) {
-    return res.status(400).json({ error: 'Enter a whole-number duration greater than zero.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_DURATION' });
   }
   if (durationUnit !== 'months' && durationUnit !== 'years') {
-    return res.status(400).json({ error: 'Choose whether the duration is measured in months or years.' });
+    return res.status(400).json({ error: 'ERROR_INVALID_DURATION_UNIT' });
+  }
+  if (projectionDuration !== null && (!Number.isInteger(projectionDuration) || projectionDuration < 2 || projectionDuration > 10)) {
+    return res.status(400).json({ error: 'ERROR_INVALID_PROJECTION' });
   }
 
   const months = durationUnit === 'years' ? duration * 12 : duration;
   if (months > MAX_MONTHS) {
-    return res.status(400).json({ error: 'The maximum projection period is 100 years.' });
+    return res.status(400).json({ error: 'ERROR_DURATION_LIMIT' });
+  }
+
+  const projectionUnitMonths = durationUnit === 'years' ? 12 : 1;
+  const projectionMonths = projectionDuration === null ? 0 : projectionDuration * projectionUnitMonths;
+  if (months + projectionMonths > MAX_MONTHS) {
+    return res.status(400).json({ error: 'ERROR_PROJECTION_LIMIT' });
   }
 
   const rate = interestRate / 100;
@@ -53,12 +63,10 @@ app.post('/api/simulate', (req, res) => {
   const totalContributions = monthlyContribution * months;
 
   if (!Number.isFinite(monthlyRate) || !Number.isFinite(totalContributions)) {
-    return res.status(422).json({ error: 'These values are too large to calculate.' });
+    return res.status(422).json({ error: 'ERROR_VALUES_TOO_LARGE' });
   }
 
-  const availableMonths = MAX_MONTHS - months;
-  const extraYears = getExtraProjectionYears(availableMonths);
-  const longestProjection = months + Math.max(0, ...extraYears.map((years) => years * 12));
+  const longestProjection = months + projectionMonths;
   const timeline = [{ month: 0, contributions: 0, balance: 0 }];
   let balance = 0;
 
@@ -67,7 +75,7 @@ app.post('/api/simulate', (req, res) => {
     balance = balance * monthlyFactor + monthlyContribution;
     if (!Number.isFinite(balance)) {
       if (month <= months) {
-        return res.status(422).json({ error: 'The result is beyond the numeric range. Try a lower rate or shorter duration.' });
+        return res.status(422).json({ error: 'ERROR_RESULT_TOO_LARGE' });
       }
       break;
     }
@@ -80,34 +88,19 @@ app.post('/api/simulate', (req, res) => {
 
   const finalPoint = timeline[months];
   if (!finalPoint) {
-    return res.status(422).json({ error: 'The result is beyond the numeric range. Try a lower rate or shorter duration.' });
+    return res.status(422).json({ error: 'ERROR_RESULT_TOO_LARGE' });
   }
 
   const interestEarned = finalPoint.balance - totalContributions;
   const growthPercent = (interestEarned / totalContributions) * 100;
   if (!Number.isFinite(growthPercent)) {
-    return res.status(422).json({ error: 'The result is beyond the numeric range. Try a lower rate or shorter duration.' });
+    return res.status(422).json({ error: 'ERROR_RESULT_TOO_LARGE' });
   }
 
-  const scenarios = extraYears
-    .map((years) => {
-      const extraMonths = years * 12;
-      const point = timeline[months + extraMonths];
-      if (!point) return null;
-
-      const scenarioInterest = point.balance - point.contributions;
-      return {
-        extraYears: years,
-        months: point.month,
-        totalContributions: roundToCents(point.contributions),
-        finalPatrimony: roundToCents(point.balance),
-        additionalContributions: roundToCents(point.contributions - totalContributions),
-        additionalValue: roundToCents(point.balance - finalPoint.balance),
-        additionalGrowth: roundToCents(Math.max(0, scenarioInterest - interestEarned)),
-        growthPercent: ((scenarioInterest / point.contributions) * 100),
-      };
-    })
-    .filter(Boolean);
+  const projectionPoint = projectionMonths > 0 ? timeline[longestProjection] : null;
+  const projectionInterest = projectionPoint
+    ? projectionPoint.balance - projectionPoint.contributions
+    : null;
 
   return res.json({
     initialPatrimony: 0,
@@ -116,20 +109,20 @@ app.post('/api/simulate', (req, res) => {
     interestEarned: roundToCents(interestEarned),
     growthPercent,
     months,
+    duration,
+    durationUnit,
     monthlyRatePercent: monthlyRate * 100,
     timeline,
-    scenarios,
+    projectionDuration,
+    projectionMonths,
+    projectionUnavailable: projectionMonths > 0 && !projectionPoint,
+    projectionFinalPatrimony: projectionPoint ? roundToCents(projectionPoint.balance) : null,
+    projectionAdditionalValue: projectionPoint ? roundToCents(projectionPoint.balance - finalPoint.balance) : null,
+    projectionAdditionalContributions: projectionPoint ? roundToCents(projectionPoint.contributions - totalContributions) : null,
+    projectionAdditionalGrowth: projectionPoint ? roundToCents(Math.max(0, projectionInterest - interestEarned)) : null,
     projectionLimitReached: months === MAX_MONTHS,
-    longerProjectionUnavailable: extraYears.length > 0 && scenarios.length === 0,
   });
 });
-
-function getExtraProjectionYears(availableMonths) {
-  if (availableMonths >= 120) return [5, 10];
-  if (availableMonths >= 60) return [5];
-  if (availableMonths >= 12) return [Math.floor(availableMonths / 12)];
-  return [];
-}
 
 function roundToCents(value) {
   if (Math.abs(value) >= Number.MAX_VALUE / 100) return value;
@@ -155,4 +148,3 @@ const server = app.listen(PORT, HOST, () => {
     console.log(`Local network access: http://${address}:${actualPort}`);
   }
 });
-
