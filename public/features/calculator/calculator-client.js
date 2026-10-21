@@ -18,7 +18,7 @@ export function chooseProjectionDuration(duration, unit, random = Math.random) {
 
 /** HTTP adapter for the calculator feature. It accepts UI values, not form elements. */
 export class CalculatorClient {
-  constructor(fetcher = globalThis.fetch, random = Math.random) {
+  constructor(fetcher = globalThis.fetch.bind(globalThis), random = Math.random) {
     this.fetcher = fetcher;
     this.random = random;
   }

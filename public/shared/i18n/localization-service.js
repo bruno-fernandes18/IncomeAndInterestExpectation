@@ -2,7 +2,7 @@ import { LOCALES, LOCALE_BY_ID } from './locale-config.js';
 
 /** Loads localized copy and exposes a small, framework independent lookup API. */
 export class LocalizationService {
-  constructor(fetcher = globalThis.fetch) {
+  constructor(fetcher = globalThis.fetch.bind(globalThis)) {
     this.fetcher = fetcher;
     this.catalogs = Object.create(null);
     this.locale = 'en';
