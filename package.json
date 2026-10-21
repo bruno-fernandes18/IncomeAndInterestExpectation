@@ -2,10 +2,12 @@
   "name": "income-and-interest-expectation",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Compound-interest projections for monthly investments.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"

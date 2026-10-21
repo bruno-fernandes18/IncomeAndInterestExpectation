@@ -27,6 +27,12 @@ npm start
 
 Dependencies are installed in this project’s ignored `node_modules/` directory. `package-lock.json` records the resolved dependency versions.
 
+## Architecture
+
+The project is a small JavaScript modular monolith. Its calculation core is framework independent, and the Express route is the HTTP adapter around that core. The browser is composed from calculator and example features, with small ViewModels coordinating state and presentation components rendering results.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries and the calculation contract. Run the built-in Node.js tests with `npm test`.
+
 ## Projection assumptions
 
 - The starting balance is R$0.00, before the first monthly contribution.
