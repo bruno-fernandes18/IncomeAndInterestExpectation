@@ -1,6 +1,6 @@
-# Income & Interest
+# Income & Interest Expectations
 
-A compound-interest calculator for recurring investments. The responsive site is served by Express, and the projection is calculated by the Node.js server.
+A multilingual Node.js and Express calculator for recurring investments and compound-interest projections. Compare monthly and yearly interest periods, explore an interactive monthly timeline, and watch a guided example in one of ten interface languages.
 
 ## Requirements
 

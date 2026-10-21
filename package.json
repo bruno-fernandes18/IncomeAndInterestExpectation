@@ -1,10 +1,28 @@
 {
   "name": "income-and-interest-expectation",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "description": "A multilingual Node.js and Express calculator for recurring investments and compound-interest projections.",
   "private": true,
   "type": "module",
-  "description": "Compound-interest projections for monthly investments.",
   "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bruno-fernandes18/IncomeAndInterestExpectation.git"
+  },
+  "homepage": "https://github.com/bruno-fernandes18/IncomeAndInterestExpectation#readme",
+  "bugs": {
+    "url": "https://github.com/bruno-fernandes18/IncomeAndInterestExpectation/issues"
+  },
+  "keywords": [
+    "compound-interest",
+    "investment-calculator",
+    "financial-calculator",
+    "investment-projection",
+    "nodejs",
+    "express",
+    "localization"
+  ],
+  "license": "MIT",
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
